@@ -9,9 +9,9 @@ RUN apt-get update && \
   rm -fr /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 RUN cd /opt/ && \
-  wget -q https://download.pytorch.org/libtorch/cpu/libtorch-shared-with-deps-1.0.1.zip && \
-  unzip libtorch-shared-with-deps-1.0.1.zip && \
-  rm libtorch-shared-with-deps-1.0.1.zip
+  wget -q https://download.pytorch.org/libtorch/cu101/libtorch-shared-with-deps-1.4.0.zip && \
+  unzip libtorch-shared-with-deps-1.4.0.zip && \
+  rm libtorch-shared-with-deps-1.4.0.zip
 
 RUN echo "$PYTORCH_DIST_DIR/lib" >> /etc/ld.so.conf.d/libtorch.conf && ldconfig
 ENV LD_LIBRARY_PATH /opt/libtorch/lib:${LD_LIBRARY_PATH}
@@ -25,6 +25,3 @@ ENV GOPATH /go
 ENV PATH $GOPATH/bin:/usr/local/go/bin:$PATH
 
 RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" && chmod -R 777 "$GOPATH"
-
-
-

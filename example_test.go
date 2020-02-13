@@ -3,7 +3,7 @@ package torch_test
 import (
 	"fmt"
 
-	"github.com/orktes/go-torch"
+	"github.com/nextcaller/go-torch"
 )
 
 func ExampleCompileTorchScript() {
