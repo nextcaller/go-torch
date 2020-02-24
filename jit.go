@@ -19,21 +19,21 @@ type JITModule struct {
 }
 
 // CompileTorchScript compiles TorchScript and returns a *JITModule
-func CompileTorchScript(torchScript string) (*JITModule, error) {
-	cstr := C.CString(torchScript)
-	defer C.free(unsafe.Pointer(cstr))
+// func CompileTorchScript(torchScript string) (*JITModule, error) {
+// 	cstr := C.CString(torchScript)
+// 	defer C.free(unsafe.Pointer(cstr))
 
-	var cErr C.Torch_Error
-	ctx := C.Torch_CompileTorchScript(cstr, &cErr)
-	if err := checkError(cErr); err != nil {
-		return nil, err
-	}
+// 	var cErr C.Torch_Error
+// 	ctx := C.Torch_CompileTorchScript(cstr, &cErr)
+// 	if err := checkError(cErr); err != nil {
+// 		return nil, err
+// 	}
 
-	mod := &JITModule{context: ctx}
-	runtime.SetFinalizer(mod, (*JITModule).finalize)
+// 	mod := &JITModule{context: ctx}
+// 	runtime.SetFinalizer(mod, (*JITModule).finalize)
 
-	return mod, nil
-}
+// 	return mod, nil
+// }
 
 // LoadJITModule loads module from file
 func LoadJITModule(path string) (*JITModule, error) {
@@ -53,19 +53,19 @@ func LoadJITModule(path string) (*JITModule, error) {
 }
 
 // Save saves Module to given path
-func (m *JITModule) Save(path string) error {
-	cstr := C.CString(path)
-	defer C.free(unsafe.Pointer(cstr))
+// func (m *JITModule) Save(path string) error {
+// 	cstr := C.CString(path)
+// 	defer C.free(unsafe.Pointer(cstr))
 
-	var cErr C.Torch_Error
-	C.Torch_ExportJITModule(m.context, cstr, &cErr)
-	if err := checkError(cErr); err != nil {
-		return err
-	}
+// 	var cErr C.Torch_Error
+// 	C.Torch_ExportJITModule(m.context, cstr, &cErr)
+// 	if err := checkError(cErr); err != nil {
+// 		return err
+// 	}
 
-	// TODO handle errors
-	return nil
-}
+// 	// TODO handle errors
+// 	return nil
+// }
 
 // GetMethod returns a method from a JITModule
 func (m *JITModule) GetMethod(method string) (*JITModuleMethod, error) {
@@ -100,22 +100,22 @@ func (m *JITModule) Forward(inputs ...interface{}) (interface{}, error) {
 	return m.RunMethod("forward", inputs...)
 }
 
-// GetMethodNames returns all method names from the module
-func (m *JITModule) GetMethodNames() []string {
-	var resLen C.ulong
-	cnamesPtr := C.Torch_JITModuleGetMethodNames(m.context, &resLen)
-	resSlice := (*[1 << 30]*C.char)(unsafe.Pointer(cnamesPtr))[:resLen:resLen]
-	defer C.free(unsafe.Pointer(cnamesPtr))
+// // GetMethodNames returns all method names from the module
+// func (m *JITModule) GetMethodNames() []string {
+// 	var resLen C.ulong
+// 	cnamesPtr := C.Torch_JITModuleGetMethodNames(m.context, &resLen)
+// 	resSlice := (*[1 << 30]*C.char)(unsafe.Pointer(cnamesPtr))[:resLen:resLen]
+// 	defer C.free(unsafe.Pointer(cnamesPtr))
 
-	names := make([]string, len(resSlice))
+// 	names := make([]string, len(resSlice))
 
-	for i, name := range resSlice {
-		names[i] = C.GoString(name)
-		C.free(unsafe.Pointer(name))
-	}
+// 	for i, name := range resSlice {
+// 		names[i] = C.GoString(name)
+// 		C.free(unsafe.Pointer(name))
+// 	}
 
-	return names
-}
+// 	return names
+// }
 
 func (m *JITModule) finalize() {
 	C.Torch_DeleteJITModule(m.context)
@@ -166,46 +166,46 @@ func (m *JITModuleMethod) Run(inputs ...interface{}) (interface{}, error) {
 }
 
 // Arguments returns method arguments for the method schema
-func (m *JITModuleMethod) Arguments() []JITModuleMethodArgument {
-	var resSize C.ulong
-	resPtr := C.Torch_JITModuleMethodArguments(m.context, &resSize)
-	defer C.free(unsafe.Pointer(resPtr))
+// func (m *JITModuleMethod) Arguments() []JITModuleMethodArgument {
+// 	var resSize C.ulong
+// 	resPtr := C.Torch_JITModuleMethodArguments(m.context, &resSize)
+// 	defer C.free(unsafe.Pointer(resPtr))
 
-	resSlice := (*[1 << 30]C.Torch_ModuleMethodArgument)(unsafe.Pointer(resPtr))[:resSize:resSize]
+// 	resSlice := (*[1 << 30]C.Torch_ModuleMethodArgument)(unsafe.Pointer(resPtr))[:resSize:resSize]
 
-	args := make([]JITModuleMethodArgument, int(resSize))
-	for i, arg := range resSlice {
-		args[i] = JITModuleMethodArgument{
-			Name: C.GoString(arg.name),
-			Type: C.GoString(arg.typ),
-		}
-		C.free(unsafe.Pointer(arg.typ))
-		C.free(unsafe.Pointer(arg.name))
-	}
+// 	args := make([]JITModuleMethodArgument, int(resSize))
+// 	for i, arg := range resSlice {
+// 		args[i] = JITModuleMethodArgument{
+// 			Name: C.GoString(arg.name),
+// 			Type: C.GoString(arg.typ),
+// 		}
+// 		C.free(unsafe.Pointer(arg.typ))
+// 		C.free(unsafe.Pointer(arg.name))
+// 	}
 
-	return args
-}
+// 	return args
+// }
 
 // Returns returns method return type information for the method schema
-func (m *JITModuleMethod) Returns() []JITModuleMethodArgument {
-	var resSize C.ulong
-	resPtr := C.Torch_JITModuleMethodReturns(m.context, &resSize)
-	defer C.free(unsafe.Pointer(resPtr))
+// func (m *JITModuleMethod) Returns() []JITModuleMethodArgument {
+// 	var resSize C.ulong
+// 	resPtr := C.Torch_JITModuleMethodReturns(m.context, &resSize)
+// 	defer C.free(unsafe.Pointer(resPtr))
 
-	resSlice := (*[1 << 30]C.Torch_ModuleMethodArgument)(unsafe.Pointer(resPtr))[:resSize:resSize]
+// 	resSlice := (*[1 << 30]C.Torch_ModuleMethodArgument)(unsafe.Pointer(resPtr))[:resSize:resSize]
 
-	args := make([]JITModuleMethodArgument, int(resSize))
-	for i, arg := range resSlice {
-		args[i] = JITModuleMethodArgument{
-			Name: C.GoString(arg.name),
-			Type: C.GoString(arg.typ),
-		}
-		C.free(unsafe.Pointer(arg.typ))
-		C.free(unsafe.Pointer(arg.name))
-	}
+// 	args := make([]JITModuleMethodArgument, int(resSize))
+// 	for i, arg := range resSlice {
+// 		args[i] = JITModuleMethodArgument{
+// 			Name: C.GoString(arg.name),
+// 			Type: C.GoString(arg.typ),
+// 		}
+// 		C.free(unsafe.Pointer(arg.typ))
+// 		C.free(unsafe.Pointer(arg.name))
+// 	}
 
-	return args
-}
+// 	return args
+// }
 
 func (m *JITModuleMethod) finalize() {
 	C.Torch_DeleteJITModuleMethod(m.context)
