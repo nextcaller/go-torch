@@ -1,5 +1,7 @@
 package torch
 
+// meed to rework this test for JIT
+
 import (
 	"io/ioutil"
 	"os"
