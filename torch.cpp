@@ -41,7 +41,7 @@ struct Torch_JITModule {
 };
 
 struct Torch_JITModule_Method {
-    torch::jit::script::Method& run;
+    torch::jit::script::Method run;
 };
 
 torch::TensorOptions Torch_ConvertDataTypeToOptions(Torch_DataType dtype) {
@@ -152,12 +152,12 @@ torch::IValue Torch_ConvertTorchIValueToIValue(Torch_IValue value) {
         std::vector<torch::IValue> values;
         values.reserve(tuple->length);
 
-        for (int i = 0; i < tuple->length; i++) {
+        for (size_t i = 0; i < tuple->length; i++) {
             auto ival = *(tuple->values+i);
             values.push_back(Torch_ConvertTorchIValueToIValue(ival));
         }
 
-        return torch::jit::Tuple::create(std::move(values));
+        return c10::ivalue::Tuple::create(std::move(values));
     }
 
     // TODO handle this case
@@ -169,7 +169,7 @@ Torch_TensorContext Torch_NewTensor(void* input_data, int64_t* dimensions, int n
     std::vector<int64_t> sizes;
     sizes.assign(dimensions, dimensions + n_dim);
 
-    torch::Tensor ten = torch::from_blob(input_data, torch::IntList(sizes), options);
+    torch::Tensor ten = torch::from_blob(input_data, torch::IntArrayRef(sizes), options);
 
     auto tensor = new Torch_Tensor();
     tensor->tensor = ten;
@@ -196,7 +196,7 @@ int64_t* Torch_TensorShape(Torch_TensorContext ctx, size_t* dims){
 }
 
 void Torch_PrintTensors(Torch_TensorContext* tensors, size_t input_size) {
-     for (int i = 0; i < input_size; i++) {
+     for (size_t i = 0; i < input_size; i++) {
         auto ctx = tensors+i;
         auto tensor = (Torch_Tensor*)*ctx;
         std::cout << tensor->tensor << "\n";
@@ -209,15 +209,6 @@ void Torch_DeleteTensor(Torch_TensorContext ctx) {
 
 }
 
-Torch_JITModuleContext Torch_CompileTorchScript(char* cstring_script, Torch_Error* error) {
-    HANDLE_TH_ERRORS
-    std::string script(cstring_script);
-    auto mod = new Torch_JITModule();
-    mod->module = torch::jit::compile(script);
-
-    return (void *)mod;
-    END_HANDLE_TH_ERRORS(error, NULL)
-}
 
 Torch_JITModuleContext Torch_LoadJITModule(char* cstring_path, Torch_Error* error) {
     HANDLE_TH_ERRORS
@@ -231,19 +222,11 @@ Torch_JITModuleContext Torch_LoadJITModule(char* cstring_path, Torch_Error* erro
 
     std::string module_path(cstring_path);
     auto mod = new Torch_JITModule();
-    mod->module = torch::jit::load(module_path, std::move(device));
-
+    mod->module = std::make_shared<torch::jit::script::Module>(torch::jit::load(module_path, std::move(device)));
     return (void *)mod;
     END_HANDLE_TH_ERRORS(error, NULL)
 }
 
-void Torch_ExportJITModule(Torch_JITModuleContext ctx, char* cstring_path, Torch_Error* error) {
-    HANDLE_TH_ERRORS
-    std::string module_path(cstring_path);
-    auto mod = (Torch_JITModule*)ctx;
-    mod->module->save(module_path);
-    END_HANDLE_TH_ERRORS(error,)
-}
 
 Torch_JITModuleMethodContext Torch_JITModuleGetMethod(Torch_JITModuleContext ctx, char* cstring_method, Torch_Error* error) {
     HANDLE_TH_ERRORS
@@ -259,25 +242,6 @@ Torch_JITModuleMethodContext Torch_JITModuleGetMethod(Torch_JITModuleContext ctx
 }
 
 
-char** Torch_JITModuleGetMethodNames(Torch_JITModuleContext ctx, size_t* len) {
-    auto mod = (Torch_JITModule*)ctx;
-    auto size = mod->module->get_methods().size();
-    *len = size;
-    auto result = (char**)malloc(sizeof(char*) * size);
-
-    int i = 0;
-    for (auto& method : mod->module->get_methods()) {
-        auto key = method.value()->name();
-        auto ckey = new char[key.length() + 1];
-        strcpy(ckey, key.c_str());
-
-        *(result + i) = ckey;
-
-        i++;
-    }
-
-    return result;
-}
 
 Torch_IValue Torch_JITModuleMethodRun(Torch_JITModuleMethodContext ctx, Torch_IValue* inputs, size_t input_size, Torch_Error* error) {
     HANDLE_TH_ERRORS
@@ -285,7 +249,7 @@ Torch_IValue Torch_JITModuleMethodRun(Torch_JITModuleMethodContext ctx, Torch_IV
 
     std::vector<torch::IValue> inputs_vec;
 
-    for (int i = 0; i < input_size; i++) {
+    for (size_t i = 0; i < input_size; i++) {
         auto ival = *(inputs+i);
         inputs_vec.push_back(Torch_ConvertTorchIValueToIValue(ival));
     }
@@ -295,60 +259,6 @@ Torch_IValue Torch_JITModuleMethodRun(Torch_JITModuleMethodContext ctx, Torch_IV
     END_HANDLE_TH_ERRORS(error, Torch_IValue{})
 }
 
-
-Torch_ModuleMethodArgument* Torch_JITModuleMethodArguments(Torch_JITModuleMethodContext ctx, size_t* res_size) {
-    auto met = (Torch_JITModule_Method*)ctx;
-    auto schema = met->run.getSchema();
-    auto arguments = schema.arguments();
-
-    auto result = (Torch_ModuleMethodArgument*)malloc(sizeof(Torch_ModuleMethodArgument)*arguments.size());
-    *res_size = arguments.size();
-
-    for(std::vector<torch::Argument>::size_type i = 0; i != arguments.size(); i++) {
-        auto name = arguments[i].name();
-        char *cstr_name = new char[name.length() + 1];
-        strcpy(cstr_name, name.c_str());
-
-        auto type = arguments[i].type()->str();
-        char *cstr_type = new char[type.length() + 1];
-        strcpy(cstr_type, type.c_str());
-
-        *(result + i) = Torch_ModuleMethodArgument{
-            .name = cstr_name,
-            .typ = cstr_type,
-        };
-    }
-
-    return result;
-}
-
-
-Torch_ModuleMethodArgument* Torch_JITModuleMethodReturns(Torch_JITModuleMethodContext ctx, size_t* res_size) {
-    auto met = (Torch_JITModule_Method*)ctx;
-    auto schema = met->run.getSchema();
-    auto arguments = schema.returns();
-
-    auto result = (Torch_ModuleMethodArgument*)malloc(sizeof(Torch_ModuleMethodArgument)*arguments.size());
-    *res_size = arguments.size();
-
-    for(std::vector<torch::Argument>::size_type i = 0; i != arguments.size(); i++) {
-        auto name = arguments[i].name();
-        char *cstr_name = new char[name.length() + 1];
-        strcpy(cstr_name, name.c_str());
-
-        auto type = arguments[i].type()->str();
-        char *cstr_type = new char[type.length() + 1];
-        strcpy(cstr_type, type.c_str());
-
-       
-        *(result + i) = Torch_ModuleMethodArgument{
-            .name = cstr_name,
-            .typ = cstr_type,
-        };
-    }
-
-    return result;
-}
 
 
 void Torch_DeleteJITModuleMethod(Torch_JITModuleMethodContext ctx) {
